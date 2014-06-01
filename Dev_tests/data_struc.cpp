@@ -43,6 +43,9 @@ void test_scan() {
     
     //default construct a scan
     Scan s1;
+    
+    //controlled construction for all acceptable args
+    Scan s2(5, 170, 93);
   
 }
 

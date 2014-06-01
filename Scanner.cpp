@@ -34,6 +34,9 @@
 //*******************************************************************
 
 // CONSTRUCTOR
+/*
+    TODO implement margin near the edges of the servo travel
+*/
 Scan::Scan(const int scan_points, const int span, const int center) 
     :sz(scan_points), spn(span), elem(new Scan_point[scan_points])
 {
@@ -58,22 +61,43 @@ Scan::Scan(const int scan_points, const int span, const int center)
         dir = -1 * dir; 
     }
     
-    //allocate buffers for the heading and data character arrays
-    /*
-        TODO look up JSON string formats again.  I need to figure out how
-        big to make the buffers
-    */
-   
+    //allocate buffers for the heading character array
+    //basic JSON string as follows {"Headings": [90,45,135,0,180]}
+    //  size:    curlys 2
+    //         brackets 2
+    //         quotes   2
+    //         colon    1
+    //       Headings   8
+    //       space      1
+    //       commas     1 * scan_points...actually scan_points-1 but who's counting
+    //        vals      3 * scan points
+    //       null term  1
+    int heading_buf_sz = 2+2+2+1+8+1+(1*scan_points)+(3*scan_points)+1;
+    if(DEBUG_SCAN) std::cout<<"heading_buf_sz is: "<< heading_buf_sz <<std::endl;
+    heads = new char[heading_buf_sz];
+    
+    //allocate buffers for the data character array
+    //basic JSON string as follows {"Measurements": [L,L,L,L,L]}
+    //  size:    curlys 2
+    //         brackets 2
+    //         quotes   2
+    //         colon    1
+    //    Measurements  12
+    //       space      1
+    //       commas     1 * scan_points...actually scan_points-1 but who's counting
+    //        vals      size_of(long) * scan_points
+    //       null term  1
+    int data_buf_sz = 2+2+2+1+12+1+(1*scan_points)+(sizeof(long)*scan_points)+1;
+    if(DEBUG_SCAN) std::cout<<"data_buf_sz is: "<< data_buf_sz <<std::endl;
+    dat = new char[heading_buf_sz];
 }
 
 // DESTRUCTOR
 Scan::~Scan() {
+    //RAII takes care of cleanup when the object goes out of scope
     delete[] elem; 
-    /*
-        TODO fix destructor when I've implemented head and dat
-    */
-    //delete[] heads; 
-    //delete[] dat; 
+    delete[] heads; 
+    delete[] dat; 
 
 }
 

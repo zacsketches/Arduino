@@ -67,8 +67,8 @@ class Scan {
   int sz;                         //number of Scan_points in the scan
   int spn;                       //degrees to scan (constrained by servo max physical limit)
   Scan_point* elem;             //array of length sp of Scan_points
-  char heads[];
-  char dat[];
+  char* heads;
+  char* dat;
 
 public:  
   Scan(const int scan_points=5, const int span=180, const int center=90);
