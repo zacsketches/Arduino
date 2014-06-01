@@ -9,6 +9,8 @@
 #include "Scanner.h"
 #include <iostream>
 
+using namespace std;
+
 void test_scan_point() {
   cout<<"************************************************************\n";
   cout<<"TESTING SCAN_POINT\n";
@@ -25,7 +27,7 @@ void test_scan_point() {
   Scan_point b(100, 50000);
   cout<<"b's heading is: "<<b.heading()<<" and b's data is: "<<b.data()<<endl;
   cout<<"setting data\n";
-  b.set_data(100000)
+  b.set_data(100000);
   cout<<"b's heading is: "<<b.heading()<<" and b's data is: "<<b.data()<<endl;
 }
 

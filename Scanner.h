@@ -54,23 +54,25 @@ public:
   void set_heading(int head) { h = head; }
 
   long data() const { return elem; }
-  void set_data( long dat ){ elem = data; }
+  void set_data( long dat ){ elem = dat; }
 };
 
 class Scan {
   int sp;                         //number of Scan_points in the scan
   int spn;                       //degrees to scan (constrained by servo max physical limit)
-  Scan_point elem[];
+  Scan_point elem[];             //array of length sp of Scan_points
+  char heads[];
+  char dat[];
 
 public:  
   Scan(const int scan_points, const int span, const int center);
-  ~Scan() {delete[] elem; }
+  ~Scan() {delete[] elem; delete[] heads; delete[] dat; }
   
   // NON-MODIFYING METHODS //
   int size() const { return sp; }
   int span() const { return spn; }
-  char[] const headings();        //JSON format
-  char[] const data();            //JSON format
+  char* headings() const;        //JSON format pointer to heads[]
+  char* data() const;            //JSON format pointer to data[]
   
   
 };
