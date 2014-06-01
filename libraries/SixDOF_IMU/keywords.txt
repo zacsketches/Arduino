@@ -1,0 +1,4 @@
+SixDOF_IMU	KEYWORD1
+getHeading	KEYWORD2
+configureIMU	KEYWORD2
+getTiltCompensationSetting	KEYWORD2
