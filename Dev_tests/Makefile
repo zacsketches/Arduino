@@ -11,7 +11,7 @@ a_scan_test: data_struc.o Scanner.o
 data_struc.o: data_struc.cpp  
 	$(CC) $(CFLAGS) data_struc.cpp
 	
-Scanner.o: /Users/zhs/Documents/Arduino/libraries/Scanner/Scanner.cpp
+Scanner.o: /Users/zhs/Documents/Arduino/libraries/Scanner/Scanner.cpp /Users/zhs/Documents/Arduino/libraries/Scanner/Scanner.h
 	$(CC) $(CFLAGS) /Users/zhs/Documents/Arduino/libraries/Scanner/Scanner.cpp
 
 clean:

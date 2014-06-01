@@ -43,11 +43,17 @@
 
 #include "Servo.h"
 
+#define DEBUG_SCAN 1
+
+#if DEBUG_SCAN == 1
+    #include <iostream>
+#endif
+
 class Scan_point{
- 	int h;		        //heading in degrees...nominal range if [0 : 180]
+ 	int h;		      //heading in degrees...nominal range if [0 : 180]
  	long elem;        //most recent reading at this point
 public:
-  Scan_point(const int heading, const long data = 0)
+  Scan_point(const int heading=90, const long data = 0)
     :h(heading), elem(data) {}
    	
   int heading() const { return h; }
@@ -58,18 +64,18 @@ public:
 };
 
 class Scan {
-  int sp;                         //number of Scan_points in the scan
+  int sz;                         //number of Scan_points in the scan
   int spn;                       //degrees to scan (constrained by servo max physical limit)
-  Scan_point elem[];             //array of length sp of Scan_points
+  Scan_point* elem;             //array of length sp of Scan_points
   char heads[];
   char dat[];
 
 public:  
-  Scan(const int scan_points, const int span, const int center);
-  ~Scan() {delete[] elem; delete[] heads; delete[] dat; }
+  Scan(const int scan_points=5, const int span=180, const int center=90);
+  ~Scan();
   
   // NON-MODIFYING METHODS //
-  int size() const { return sp; }
+  int size() const { return sz; }
   int span() const { return spn; }
   char* headings() const;        //JSON format pointer to heads[]
   char* data() const;            //JSON format pointer to data[]

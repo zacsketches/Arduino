@@ -1,22 +1,6 @@
 /*
- Servo.cpp - Interrupt driven Servo library for Arduino using 16 bit timers- Version 2
- Copyright (c) 2009 Michael Margolis.  All right reserved.
- 
- This library is free software; you can redistribute it and/or
- modify it under the terms of the GNU Lesser General Public
- License as published by the Free Software Foundation; either
- version 2.1 of the License, or (at your option) any later version.
- 
- This library is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- Lesser General Public License for more details.
- 
- You should have received a copy of the GNU Lesser General Public
- License along with this library; if not, write to the Free Software
- Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- */
-
+    TODO add my beer license
+*/
 /* 
  
  A servo is activated by creating an instance of the Servo class passing the desired pin to the attach() method.
@@ -43,6 +27,56 @@
 */
 
 #include "Scanner.h"
+
+
+//*******************************************************************
+//*                         SCAN METHODS
+//*******************************************************************
+
+// CONSTRUCTOR
+Scan::Scan(const int scan_points, const int span, const int center) 
+    :sz(scan_points), spn(span), elem(new Scan_point[scan_points])
+{
+    //divide the span in angular sections and assign the test points
+    int sections = scan_points - 1;
+    int angular_seperation = span / sections;
+    
+    //scan point zero is at the center of the scan with even points
+    //to the left (port) and odd points to right (starboard)...can't
+    //help it..Navy habits die hard
+    int head = center;
+    int dir = -1;
+    int multiple = 0;
+    for(int i = 0; i < scan_points; ++i) {
+        if(DEBUG_SCAN) std::cout<<"multiple is: "<< multiple <<std::endl;
+        if(DEBUG_SCAN) std::cout<<"dir is: "<< dir <<std::endl;
+        head = center + (dir * multiple * angular_seperation); 
+        elem[i].set_heading(head);      
+        if(DEBUG_SCAN) std::cout<<"head is: "<< head <<std::endl;
+        if(i==0) ++multiple;
+        if(i>0 && (i%2==0)) ++multiple;
+        dir = -1 * dir; 
+    }
+    
+    //allocate buffers for the heading and data character arrays
+    /*
+        TODO look up JSON string formats again.  I need to figure out how
+        big to make the buffers
+    */
+   
+}
+
+// DESTRUCTOR
+Scan::~Scan() {
+    delete[] elem; 
+    /*
+        TODO fix destructor when I've implemented head and dat
+    */
+    //delete[] heads; 
+    //delete[] dat; 
+
+}
+
 
 /*
 
