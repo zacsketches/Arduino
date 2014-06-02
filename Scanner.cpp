@@ -230,9 +230,6 @@ Scanner::Scanner(const int servo_pin,
     //no setup configuration required for Ping))) sensor
 }
 
-
-#if DEBUG_SCAN == 0 /* ONLY INCLUDE THIS CODE TO COMPILE INSIDE THE ARDUINO IDE */
-
 // RUN ... take data and store it.
 void Scanner::run(){
     static unsigned long command_time;	//time servo ordered to move
@@ -324,8 +321,6 @@ int Scanner::us_to_cm(const long microseconds)
   */
   return microseconds / 29 / 2;
 }
-
-#endif /*END ARDUINO IDE ONLY BLOCK */
 
 /*
 long Scanner::measure_angle(int h) {

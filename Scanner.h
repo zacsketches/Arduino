@@ -25,7 +25,7 @@
 #ifndef Scanner_h
 #define Scanner_h
 
-#define DEBUG_SCAN 1        //1 for compilation outside of Arduino IDE
+#define DEBUG_SCAN 0        //1 for compilation outside of Arduino IDE
 #define DEBUG_SER  0        //1 for debug prints to adruino Serial.print cmd
 
 #if DEBUG_SCAN == 0
