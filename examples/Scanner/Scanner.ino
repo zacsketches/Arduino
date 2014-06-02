@@ -1,45 +1,26 @@
-/* Test my Scanner class to determine the best algorithm for delay between
-   servo test points.
+/* 
+   Scanner implements control over an ultrsonic sensor mounted to a 
+   servo in order to scan multiple headings with a single sensor.
    
-   The functional steps I want in this test are:
-   1. Create a Scanner object
-   2. Display config data for the scanner via Serial comms
-   3. Make a scan and store results
-   4. When a button is pushed decrease the angular rate and rescan.
-   
+   The signature for creating a scanner is:
+   Scanner(const int servo_pin, 
+             const int ping_pin, 
+             const int center = 90,
+             const int span = 180,
+             const int test_points = 5);
 */
 
 #include <Scanner.h>
 
-/*----Data structures--------*/
-struct Scan_point{
-	int index;		//1 to number_of_scan_headings
-	int heading;		//in degrees
-	long trip_distance;	//distance the sensor trips
-	byte mask_value;	//1, 2, 4, 8, 16, 32, 64, or 128	
-};
-
-/*------Constants------------*/
-const int number_of_scan_headings = 5;    
-const int scan_order[number_of_scan_headings] = {3, 2, 4, 1, 5};   //index numbers of scan[]
-
 /*--------Global Variables----------*/
-Scan_point scan[number_of_scan_headings];
-const int* order_pointer = scan_order;
-Scanner scanner;                           //requires attach function in setup  
+Scanner scanner;                           
 
 /*------Configuration Options--------*/
 const bool debug = false;
 
 void setup() {
   Serial.begin(9600);
-  
-  //configure scan points
-  Scan_point p1 = {1, 170, 30, B10000};
-  Scan_point p2 = {2, 130, 60, B01000};
-  Scan_point p3 = {3, 90, 60,  B00100};  //center 
-  Scan_point p4 = {4, 50, 60,  B00010};
-  Scan_point p5 = {5, 10, 30,  B00001};
+
   
   //push the scan points into the scan array
   scan[0] = p1;

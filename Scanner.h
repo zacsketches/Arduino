@@ -1,10 +1,3 @@
-/*
-  Scanner.h - An extension of an interrupt driven Servo library for Arduino 
-  using 16 bit timers.  Adapted from 2009 work by Michael Margolis.  Modified to
-  include custom functions for controlling the scan pattern for a ultrasonic range 
-  finder by Zac and Greyson Staples July 2013.
-  
-*/
 
 /* 
   A scanner is activated by creating an instance of the Scanner class then passing
@@ -51,16 +44,16 @@
 
 class Scan_point{
  	int h;		      //heading in degrees...nominal range if [0 : 180]
- 	long elem;        //most recent reading at this point
+ 	int elem;        //most recent reading at this point, in cm for ultrasonic sensor
 public:
-  Scan_point(const int heading=90, const long data = 0)
+  Scan_point(const int heading=90, const int data = 0)
     :h(heading), elem(data) {}
    	
   int heading() const { return h; }
   void set_heading(int head) { h = head; }
 
-  long data() const { return elem; }
-  void set_data( long dat ){ elem = dat; }
+  const int data() const { return elem; }
+  void set_data( int dat ){ elem = dat; }
 };
 
 class Scan {
@@ -77,9 +70,12 @@ public:
   // NON-MODIFYING METHODS //
   int size() const { return sz; }
   int span() const { return spn; }
-  char* headings() const;        //JSON format pointer to heads[]
-  char* data() const;            //JSON format pointer to data[]
+  const char* headings() const;        //JSON format pointer to heads[]
+  const char* data() const;            //JSON format pointer to dat[]
   
+  // MODIFYING METHODS //            
+  bool update_by_heading(const int heading, const int data);  //returns true on successful update
+  bool update_by_index(const int index, const int data);
   
 };
 

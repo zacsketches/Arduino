@@ -44,8 +44,39 @@ void test_scan() {
     //default construct a scan
     Scan s1;
     
+    
     //controlled construction for all acceptable args
-    Scan s2(5, 170, 93);
+    Scan s2(7, 170, 93);
+    cout<<"size of s2 is: "<<s2.size()<<" and span of s2 is: "<<s2.span()<<endl;
+    
+    //test data outputs
+    const char* heads = s2.headings();
+    cout<<"The JSON headings string is: "<<heads<<endl;
+    const char* data = s2.data();
+    cout<<"The JSON data string is: "<<data<<endl;
+    
+    //update data
+    cout<<"updating data\n";
+    s2.update_by_heading(93, 30000);
+    s2.update_by_heading(121, 24320);
+    s2.update_by_heading(65, 24320);
+    s2.update_by_index(3, 12424);
+    s2.update_by_index(5, 23324);
+    s2.update_by_index(4, 31400);
+    s2.update_by_index(6, 24000);
+    
+    heads = s2.headings();
+    cout<<"The JSON headings string is: "<<heads<<endl;
+    data = s2.data();
+    cout<<"The JSON data string is: "<<data<<endl;
+    
+    //try invalid headings and indices
+    if(!s2.update_by_heading(90, 999)) cout<<"bad heading returned false\n";
+    if(!s2.update_by_index(-1, 999)) cout<<"bad index returned false\n";
+    if(!s2.update_by_index(8, 999)) cout<<"bad index returned false\n";
+    
+    
+    
   
 }
 

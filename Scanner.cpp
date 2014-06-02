@@ -62,34 +62,36 @@ Scan::Scan(const int scan_points, const int span, const int center)
     }
     
     //allocate buffers for the heading character array
-    //basic JSON string as follows {"Headings": [90,45,135,0,180]}
+    //basic JSON string as follows {\"Headings\": [90,45,135,0,180]}
     //  size:    curlys 2
     //         brackets 2
     //         quotes   2
     //         colon    1
+    //        escapes   2
     //       Headings   8
     //       space      1
     //       commas     1 * scan_points...actually scan_points-1 but who's counting
     //        vals      3 * scan points
     //       null term  1
-    int heading_buf_sz = 2+2+2+1+8+1+(1*scan_points)+(3*scan_points)+1;
+    int heading_buf_sz = 2+2+2+1+2+8+1+(1*scan_points)+(3*scan_points)+1;
     if(DEBUG_SCAN) std::cout<<"heading_buf_sz is: "<< heading_buf_sz <<std::endl;
     heads = new char[heading_buf_sz];
     
     //allocate buffers for the data character array
-    //basic JSON string as follows {"Measurements": [L,L,L,L,L]}
+    //basic JSON string as follows {\"Measurements\": [L,L,L,L,L]}
     //  size:    curlys 2
     //         brackets 2
     //         quotes   2
     //         colon    1
+    //        escapes   2
     //    Measurements  12
     //       space      1
     //       commas     1 * scan_points...actually scan_points-1 but who's counting
-    //        vals      size_of(long) * scan_points
+    //        vals      5 * scan_points  max int is 32,767 (5 digits)
     //       null term  1
-    int data_buf_sz = 2+2+2+1+12+1+(1*scan_points)+(sizeof(long)*scan_points)+1;
+    int data_buf_sz = 2+2+2+1+2+12+1+(1*scan_points)+(5*scan_points)+1;
     if(DEBUG_SCAN) std::cout<<"data_buf_sz is: "<< data_buf_sz <<std::endl;
-    dat = new char[heading_buf_sz];
+    dat = new char[data_buf_sz];
 }
 
 // DESTRUCTOR
@@ -100,6 +102,72 @@ Scan::~Scan() {
     delete[] dat; 
 
 }
+
+// RETURN POINTER TO THE HEADINGS BUFFER CONTAINING A JSON STRING
+const char* Scan::headings() const{
+    //basic JSON string as follows {\"Headings\": [90,45,135,0,180]}
+    
+    //temp buffer for string representation of int val
+    char buf[sizeof(long)];
+    
+    strcpy(heads, "{\"Headings\": [" ) ;
+    for(int i = 0; i < sz; ++i) {
+        //get string representation of heading val
+        sprintf(buf, "%d", elem[i].heading());
+        
+        if(i != 0) strcat(heads,",");
+        strcat(heads, buf);
+    }
+    strcat(heads, "]}");
+    
+    return heads;
+}
+
+// RETURN POINTER TO THE DATA BUFFER CONTAINING A JSON STRING
+const char* Scan::data() const{
+    //basic JSON string as follows {\"Measurements\": [L,L,L,L,L]}
+    
+    //temp buffer for string representation of long val
+    char buf[sizeof(long)];
+    
+    strcpy(dat, "{\"Measurements\": [");
+    for(int i = 0; i < sz; ++i) {
+        //get string representation of dat val
+        sprintf(buf, "%d", elem[i].data());
+        
+        if(i != 0) strcat(dat, ",");
+        strcat(dat, buf);
+    }
+    strcat(dat, "]}");
+    
+    return dat;
+}
+
+// UPDATE DATA IN THE SCAN
+bool Scan::update_by_heading(const int heading, const int data){
+    //returns true on successful update
+    bool success = false;
+    for(int i = 0; i < sz; ++i) {
+        //find index for given heading
+        if (elem[i].heading() == heading) {
+            elem[i].set_data(data);
+            success = true;
+            break;
+        }
+    }
+    return success;
+}
+
+bool Scan::update_by_index(const int index, const int data){
+    //returns true on successful update
+    bool success = false;
+    if( (index >=0) && (index < sz) ) {
+        elem[index].set_data(data);
+        success = true;
+    }
+    return success;
+}
+
 
 
 /*
