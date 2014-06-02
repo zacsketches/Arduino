@@ -1,15 +1,6 @@
 
 /* 
-  A scanner is activated by creating an instance of the Scanner class then passing
-  passing the desired servo connection pin and the PING))) sensor pin to the attach() function.
-  The servos are pulsed in the background using the value most recently written using the write() method
-
-  Note that analogWrite of PWM on pins associated with the timer are disabled when the first servo is attached.
-  Timers are seized as needed in groups of 12 servos - 24 servos use two timers, 48 servos will use four.
-  The sequence used to sieze timers is defined in timers.h
-
-  The methods are:
-
+  
    Scanner - Class for manipulating servo motors connected to Arduino pins.
 
    attach(servo_pin, ping_pin )  - Attaches a servo motor and a PING))) sensor to an i/o pin
@@ -34,13 +25,18 @@
 #ifndef Scanner_h
 #define Scanner_h
 
-#include "Servo.h"
+#define DEBUG_SCAN 0        //1 for compilation outside of Arduino IDE
+#define DEBUG_SER  1        //1 for debug prints to adruino Serial.print cmd
 
-#define DEBUG_SCAN 1
+#if DEBUG_SCAN == 0
+    #include <Arduino.h>
+#endif
 
 #if DEBUG_SCAN == 1
     #include <iostream>
 #endif
+
+#include <Servo.h>
 
 class Scan_point{
  	int h;		      //heading in degrees...nominal range if [0 : 180]
@@ -71,6 +67,8 @@ public:
   int size() const { return sz; }
   int span() const { return spn; }
   const char* headings() const;        //JSON format pointer to heads[]
+  const int heading_by_index(const byte index) const;
+  
   const char* data() const;            //JSON format pointer to dat[]
   
   // MODIFYING METHODS //            
@@ -79,29 +77,76 @@ public:
   
 };
 
-/* commented out so I can test my data structures first
+//*******************************************************************
+//*                         SCANNER CLASS
+//*******************************************************************
 
-class Scanner {
+class Scanner : public Servo {
 private: 
   //Servo data
-  int sp;               //Servo pin
-  int ctr;              //where the servo points directly ahead of the bot
-  Servo servo;          //Servo object
+  int sp;                 //Servo pin
+  int ctr;                //where the servo points directly ahead of the bot
+  Servo servo;            //Servo object
+  int sar;                //servo_angular_rate the servo turns out
+  byte servo_state;       // B0001->servo ready 
+  					      // B0010->move ordered 
+                          // B0100->move complete
+  struct Scan_order{
+      byte* order;
+      int pos;
+      byte sz;
+      
+      Scan_order(int test_points);   //test_points is the unique points in the scan
+                                    //the test order will come back to the middle after every
+                                    //other measurement like the examples below for a 7 and 5 point scan
+                                    //where 4 and 3 are the respective middles
+                                    //      4 5 4 3 4 6 4 2 4 7 4 1
+                                    //      3 4 3 2 3 5 3 1
+      ~Scan_order() { delete[] order; } 
+      
+      Scan_order& operator++() {    //prefix ++
+          ++pos;
+          if (pos == sz) pos = 0;
+          return *this;
+      }
+      byte current() {return order[pos]; }
+  };
+ 
 
   //Ultrasonic sensor data
   int pp;               //ping_pin
 
   //Scan object handles data for the scanner
-  Scan  scan;           
+  Scan  scan;
+  Scan_order scan_order;
+  
+  int find_delay(int target_angle);       
+  void pulse(); 
+  void increment_cur();
 
 public:
   //constructor
+  /*
+    TODO store servo_angular rate in eeprom.  
+    Then try to read it before setting default
+  */
   Scanner(const int servo_pin, 
           const int ping_pin, 
           const int center = 90,
           const int span = 180,
-          const int test_points = 5);
+          const int test_points = 5,
+          const int servo_angular_rate = 280/60+5);	//in millisec / deg.  Futaba S3004 280us/60deg plus a tad
+          
   
+  // NON-MODIFYING METHODS
+  const char* headings() { return scan.headings(); }
+  const char* data() { return scan.data(); }
+  
+  // MODIFYING METHODS
+  void run_once();      //run a scan of all headings in the scan pattern
+  
+};  
+  /*  
   char[] headings();
 
   long measure_angle(int heading);    // return distance measurement at angle provided

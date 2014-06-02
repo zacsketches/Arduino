@@ -13,27 +13,27 @@
 #include <Scanner.h>
 
 /*--------Global Variables----------*/
-Scanner scanner;                           
+Scanner scanner(9, 8);                          //jack servo on pin 9 and PING))) on pin 8
+const float base_angular_rate = .28/60+.0005;	//Futaba S3004 .28sec/60deg plus a tad from an earlier config run
 
-/*------Configuration Options--------*/
-const bool debug = false;
 
 void setup() {
   Serial.begin(9600);
 
-  
+/*  
   //push the scan points into the scan array
   scan[0] = p1;
   scan[1] = p2;
   scan[2] = p3;
   scan[3] = p4;
   scan[4] = p5;
-  
-  //configure scanner
-  scanner.attach(9, 8);  //jack servo on pin 9 and PING))) on pin 8
+   
+*/
 }
 
 void loop() {
+    while(true) { delay(10); }
+/*
   //show scanner donfig data
   double rate = scanner.get_servo_angular_rate();
   char buffer[75];
@@ -53,8 +53,10 @@ void loop() {
     sprintf(buffer, "\t measurement at point %d is: %d", i, scan_results[i]);
     Serial.println(buffer);
   }
+*/
 }
 
+/*
 const int* advance_order_pointer() {
   const int* p = order_pointer;
   p++;
@@ -89,3 +91,5 @@ long test_point(int p) {
 
   return cm;
 }
+
+*/

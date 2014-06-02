@@ -51,11 +51,17 @@ Scan::Scan(const int scan_points, const int span, const int center)
     int dir = -1;
     int multiple = 0;
     for(int i = 0; i < scan_points; ++i) {
-        if(DEBUG_SCAN) std::cout<<"multiple is: "<< multiple <<std::endl;
-        if(DEBUG_SCAN) std::cout<<"dir is: "<< dir <<std::endl;
+        #if DEBUG_SCAN == 1
+          std::cout<<"multiple is: "<< multiple <<std::endl;
+        #endif
+        #if DEBUG_SCAN == 1
+          std::cout<<"dir is: "<< dir <<std::endl;
+        #endif
         head = center + (dir * multiple * angular_seperation); 
         elem[i].set_heading(head);      
-        if(DEBUG_SCAN) std::cout<<"head is: "<< head <<std::endl;
+        #if DEBUG_SCAN == 1
+          std::cout<<"head is: "<< head <<std::endl;
+        #endif
         if(i==0) ++multiple;
         if(i>0 && (i%2==0)) ++multiple;
         dir = -1 * dir; 
@@ -74,7 +80,9 @@ Scan::Scan(const int scan_points, const int span, const int center)
     //        vals      3 * scan points
     //       null term  1
     int heading_buf_sz = 2+2+2+1+2+8+1+(1*scan_points)+(3*scan_points)+1;
-    if(DEBUG_SCAN) std::cout<<"heading_buf_sz is: "<< heading_buf_sz <<std::endl;
+    #if DEBUG_SCAN == 1
+      std::cout<<"heading_buf_sz is: "<< heading_buf_sz <<std::endl;
+    #endif
     heads = new char[heading_buf_sz];
     
     //allocate buffers for the data character array
@@ -90,7 +98,9 @@ Scan::Scan(const int scan_points, const int span, const int center)
     //        vals      5 * scan_points  max int is 32,767 (5 digits)
     //       null term  1
     int data_buf_sz = 2+2+2+1+2+12+1+(1*scan_points)+(5*scan_points)+1;
-    if(DEBUG_SCAN) std::cout<<"data_buf_sz is: "<< data_buf_sz <<std::endl;
+    #if DEBUG_SCAN == 1
+      std::cout<<"data_buf_sz is: "<< data_buf_sz <<std::endl;
+    #endif
     dat = new char[data_buf_sz];
 }
 
@@ -122,6 +132,15 @@ const char* Scan::headings() const{
     
     return heads;
 }
+
+// RETURN INT OF A HEADING BY THE INDEX, -1 ON INDEX OUT OF BOUNDS
+const int Scan::heading_by_index(const byte index) const{
+    if( (index >=0) && (index < sz) ) {
+        return elem[index].heading();
+    }
+    return -1;
+}
+
 
 // RETURN POINTER TO THE DATA BUFFER CONTAINING A JSON STRING
 const char* Scan::data() const{
@@ -168,10 +187,109 @@ bool Scan::update_by_index(const int index, const int data){
     return success;
 }
 
+//*******************************************************************
+//*                         SCAN ORDER CONSTRUCTOR
+//*******************************************************************
+Scanner::Scan_order::Scan_order(int test_points) {
+    pos = 0;
+    sz = 2* (test_points -1);
+    order = new byte[sz];
+    int mult = 1;
+    for(int i = 0; i < sz; ++i) {
+        if(i%2 == 0) order[i] = 0;    //always come back to the middle
+        else {
+            order[i] = mult;
+        }
+    }     
+}
+
+
+//*******************************************************************
+//*                         SCANNER CLASS METHODS
+//*******************************************************************
+
+// CONSTRUCTOR
+Scanner::Scanner(const int servo_pin, 
+    const int ping_pin, 
+    const int center,
+    const int span,
+    const int test_points,
+    const int servo_angular_rate)
+    :sp(servo_pin), pp(ping_pin), ctr(center), scan(test_points, span, center),
+     sar(servo_angular_rate), scan_order(test_points)
+{
+    //attach servo
+    servo.attach(servo_pin);
+    servo_state = 0x01;     // Ready
+    
+    /*
+        TODO take the hard coded cheats out of scan_order
+    */
+    
+    //no setup configuration required for Ping))) sensor
+}
+
+
+// RUN ... take data and store it.
+void Scanner::run_once(){
+    static unsigned long command_time;	//time servo ordered to move
+    static unsigned long ready_time;	//time servo will be ready
+    
+    //if servo is ready then order next scan
+    if(servo_state & B0001 == 0x01) {	    //B0001 tests servo_ready bit
+        int target_heading = scan.heading_by_index( scan_order.current() );
+        command_time=millis();		        //record time move was ordered
+        ready_time = command_time + find_delay(target_heading);
+        servo.write(target_heading);		//order servo to move
+        servo_state = 0x02;		           //set state to B0000 0010->move ordered
+        #if DEBUG_SER == 1
+            Serial.print("\tcommand time is: ");
+            Serial.println(command_time);
+            Serial.print("\tready time is: ");
+            Serial.println(ready_time);
+            Serial.print("\tservo state is: ");
+            Serial.println(servo_state, HEX);
+        #endif          
+    }
+    
+    //if servo move ordered and time has elapsed then move is complete
+    if((servo_state == B0010) && ( millis()>=ready_time) ) {
+//     	    long duration = scanner.pulse(pp);
+//      	int cm = scanner.microsecondsToCentimeters(duration);
+        servo_state = 0x04; 	//B0000 0100->move_complete
+    }
+    
+    //if servo move complete, then pulse and update measurement
+    if(servo_state == 0x04) {	//B0000 0100->move_complete
+        pulse();
+        servo_state = 0x01;	    //B0000 0001->ready
+        ++scan_order;           //advance current to the the next scan point
+    }
+}
+
+//*******************************************************************
+//*                         SCANNER HELPER FUNCTIONS
+//*******************************************************************
+
+// RETURN DELAY IN MILLISECONDS FOR THE SERVO TO MOVE BETWEEN TWO ANGLES
+int Scanner::find_delay(const int target_angle) {
+	int current_angle = servo.read();
+	int theta = target_angle - current_angle;
+	theta = abs(theta);
+
+	int delay = theta * sar;
+	return delay;	//in milliseconds
+}
+
+// PULSE THE SENSOR AND STORE THE DATA
+void Scanner::pulse() {
+    /*
+        TODO implement
+    */
+}
 
 
 /*
-
 long Scanner::measure_angle(int h) {
 	double travel_delay = find_delay(h);
 	travel_delay = int(travel_delay);
@@ -217,12 +335,5 @@ double Scanner::get_servo_angular_rate() {
 	return servo_angular_rate;
 }
 
-double Scanner::find_delay(int target_angle) {
-	int current_angle = this->read();
-	int diff = target_angle - current_angle;
-	diff = abs(diff);
 
-	double delay = diff * get_servo_angular_rate();
-	return delay;	
-}
 */
