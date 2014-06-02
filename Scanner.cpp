@@ -134,7 +134,7 @@ const char* Scan::headings() const{
 }
 
 // RETURN INT OF A HEADING BY THE INDEX, -1 ON INDEX OUT OF BOUNDS
-const int Scan::heading_by_index(const byte index) const{
+const int Scan::heading_by_index(const int index) const{
     if( (index >=0) && (index < sz) ) {
         return elem[index].heading();
     }
@@ -193,12 +193,13 @@ bool Scan::update_by_index(const int index, const int data){
 Scanner::Scan_order::Scan_order(int test_points) {
     pos = 0;
     sz = 2* (test_points -1);
-    order = new byte[sz];
+    order = new int[sz];
     int mult = 1;
     for(int i = 0; i < sz; ++i) {
         if(i%2 == 0) order[i] = 0;    //always come back to the middle
         else {
             order[i] = mult;
+            ++mult;
         }
     }     
 }
@@ -230,8 +231,10 @@ Scanner::Scanner(const int servo_pin,
 }
 
 
+#if DEBUG_SCAN == 0 /* ONLY INCLUDE THIS CODE TO COMPILE INSIDE THE ARDUINO IDE */
+
 // RUN ... take data and store it.
-void Scanner::run_once(){
+void Scanner::run(){
     static unsigned long command_time;	//time servo ordered to move
     static unsigned long ready_time;	//time servo will be ready
     
@@ -253,15 +256,13 @@ void Scanner::run_once(){
     }
     
     //if servo move ordered and time has elapsed then move is complete
-    if((servo_state == B0010) && ( millis()>=ready_time) ) {
-//     	    long duration = scanner.pulse(pp);
-//      	int cm = scanner.microsecondsToCentimeters(duration);
+    if((servo_state == 0x02) && ( millis()>=ready_time) ) { //B0000 0010->move_ordered
         servo_state = 0x04; 	//B0000 0100->move_complete
     }
     
     //if servo move complete, then pulse and update measurement
     if(servo_state == 0x04) {	//B0000 0100->move_complete
-        pulse();
+        take_reading();
         servo_state = 0x01;	    //B0000 0001->ready
         ++scan_order;           //advance current to the the next scan point
     }
@@ -281,13 +282,50 @@ int Scanner::find_delay(const int target_angle) {
 	return delay;	//in milliseconds
 }
 
-// PULSE THE SENSOR AND STORE THE DATA
-void Scanner::pulse() {
-    /*
-        TODO implement
-    */
+void Scanner::take_reading() {
+    //the servo is already in the right position when this method is
+    //called so we just need to bang the sonar, get the measurement
+    //and then save it to the scan
+    long dur = pulse();
+    int cm = us_to_cm(dur);
+    
+    int scan_index = scan_order.current();
+    scan.update_by_index(scan_index, cm);
 }
 
+// PULSE THE SENSOR AND STORE THE DATA
+long Scanner::pulse() {
+    //standard pulse method for Parallax PING))) sensor
+    pinMode(pp, OUTPUT);
+    digitalWrite(pp, LOW);
+    delayMicroseconds(2);
+    digitalWrite(pp, HIGH);
+    delayMicroseconds(5);
+    digitalWrite(pp, LOW);
+
+    // The same pin is used to read the signal from the PING))): a HIGH
+    // pulse whose duration is the time (in microseconds) from the sending
+    // of the ping to the reception of its echo off of an object.
+    pinMode(pp, INPUT);
+    long duration = pulseIn(pp, HIGH);
+
+    return duration;
+}
+
+
+int Scanner::us_to_cm(const long microseconds)
+{
+  // The speed of sound is 340 m/s or 29 microseconds per centimeter.
+  // The ping travels out and back, so to find the distance of the
+  // object we take half of the distance travelled.
+  /*
+    TODO I could calibrate this and take temp and pressure into account,
+    but this doesn't fix the lack or resolution in the sonar sensor
+  */
+  return microseconds / 29 / 2;
+}
+
+#endif /*END ARDUINO IDE ONLY BLOCK */
 
 /*
 long Scanner::measure_angle(int h) {

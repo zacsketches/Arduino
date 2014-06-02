@@ -25,8 +25,8 @@
 #ifndef Scanner_h
 #define Scanner_h
 
-#define DEBUG_SCAN 0        //1 for compilation outside of Arduino IDE
-#define DEBUG_SER  1        //1 for debug prints to adruino Serial.print cmd
+#define DEBUG_SCAN 1        //1 for compilation outside of Arduino IDE
+#define DEBUG_SER  0        //1 for debug prints to adruino Serial.print cmd
 
 #if DEBUG_SCAN == 0
     #include <Arduino.h>
@@ -67,7 +67,7 @@ public:
   int size() const { return sz; }
   int span() const { return spn; }
   const char* headings() const;        //JSON format pointer to heads[]
-  const int heading_by_index(const byte index) const;
+  const int heading_by_index(const int index) const;
   
   const char* data() const;            //JSON format pointer to dat[]
   
@@ -88,28 +88,28 @@ private:
   int ctr;                //where the servo points directly ahead of the bot
   Servo servo;            //Servo object
   int sar;                //servo_angular_rate the servo turns out
-  byte servo_state;       // B0001->servo ready 
+  char servo_state;       // B0001->servo ready 
   					      // B0010->move ordered 
                           // B0100->move complete
   struct Scan_order{
-      byte* order;
+      int* order;
       int pos;
-      byte sz;
-      
+      int sz;
+
       Scan_order(int test_points);   //test_points is the unique points in the scan
-                                    //the test order will come back to the middle after every
-                                    //other measurement like the examples below for a 7 and 5 point scan
-                                    //where 4 and 3 are the respective middles
-                                    //      4 5 4 3 4 6 4 2 4 7 4 1
-                                    //      3 4 3 2 3 5 3 1
+                                      //the test order will come back to the middle after every
+                                      //other measurement like the examples below for a 7 and 5 point scan
+                                      //where 0 is the middle
+                                      //      0 1 0 2 0 3 0 4 0 5 0 6
+                                      //      0 1 0 2 0 3 0 4
       ~Scan_order() { delete[] order; } 
-      
+
       Scan_order& operator++() {    //prefix ++
           ++pos;
           if (pos == sz) pos = 0;
           return *this;
       }
-      byte current() {return order[pos]; }
+      int current() {return order[pos]; }
   };
  
 
@@ -120,9 +120,10 @@ private:
   Scan  scan;
   Scan_order scan_order;
   
-  int find_delay(int target_angle);       
-  void pulse(); 
-  void increment_cur();
+  int find_delay(int target_angle);
+  void take_reading();       
+  long pulse();
+  int us_to_cm(const long duration); 
 
 public:
   //constructor
@@ -137,41 +138,13 @@ public:
           const int test_points = 5,
           const int servo_angular_rate = 280/60+5);	//in millisec / deg.  Futaba S3004 280us/60deg plus a tad
           
-  
   // NON-MODIFYING METHODS
   const char* headings() { return scan.headings(); }
   const char* data() { return scan.data(); }
   
   // MODIFYING METHODS
-  void run_once();      //run a scan of all headings in the scan pattern
+  void run();      //run a scan of all headings in the scan pattern
   
 };  
-  /*  
-  char[] headings();
-
-  long measure_angle(int heading);    // return distance measurement at angle provided
-  void detach();
-  void write(int value);             // if value is < 200 its treated as an angle, otherwise as pulse width in microseconds 
-  void writeMicroseconds(int value); // Write pulse width in microseconds 
-  int read();                        // returns current pulse width as an angle between 0 and 180 degrees
-  int readMicroseconds();            // returns current pulse width in microseconds for this servo
-  bool attached();                   // return true if this servo is attached, otherwise false
-  double set_servo_angular_rate(double new_rate);	//return newly set rate.
-  double get_servo_angular_rate(); 
-  long pulse(const int ping_pin);	 	// ping the sensor and return the distance in cm
-  long microsecondsToCentimeters(const long microseconds);	//convert pulse duration to distance
-private:
-  double find_delay(int target_angle); 	//compute delay for servo to travel to target heading
-  int scan_points[5];					//array of angles measurements are taken at
-  int scan_delay;						  //milliseconds
-  int pulse_delay;              		//milliseconds
-  double servo_angular_rate;		    //Seconds per degree.
- 
-  uint8_t servoIndex;               // index into the channel data for this servo
-  int8_t min;                       // minimum is this value times 4 added to MIN_PULSE_WIDTH    
-  int8_t max;                       // maximum is this value times 4 added to MAX_PULSE_WIDTH   
-};
-
-*/
 
 #endif
