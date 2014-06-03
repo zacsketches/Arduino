@@ -1,32 +1,31 @@
+/*
+    TODO add attribution info
+*/
 
 /* 
-  
-   Scanner - Class for manipulating servo motors connected to Arduino pins.
+   Scanner implements control over an ultrsonic sensor mounted to a 
+   servo in order to scan multiple headings with a single sensor.
+   
+   The signature for creating a scanner is:
+   Scanner(const int servo_pin, 
+           const int ping_pin, 
+           const int center = 90,
+           const int span = 180,
+           const int test_points = 5,
+           const int servo_angular_rate = 280/60+5);	in millisec / deg.  Futaba S3004 280us/60deg plus a tad
+             
+    Calling .data() or .readings() returns a JSON formatted string of the most recent
+    data in the scanner.
 
-   attach(servo_pin, ping_pin )  - Attaches a servo motor and a PING))) sensor to an i/o pin
- 
-   write()     - Sets the servo angle in degrees.  (invalid angle that is valid as pulse in microseconds is treated as microseconds)
-   writeMicroseconds() - Sets the servo pulse width in microseconds 
-   read()      - Gets the last written servo pulse width as an angle between 0 and 180. 
-   readMicroseconds()   - Gets the last written servo pulse width in microseconds. (was read_us() in first release)
-   attached()  - Returns true if there is a servo attached. 
-   detach()    - Stops an attached servos from pulsing its i/o pin. 
- */
-
-/* 7/24/13 Added a bit of code to calculate the degrees of travel and then the amount of 
-   delay required for the servo to move to this position.
-
-   NOTE: use of double type for calculating delay does not increase precision on 
-   Arduino Uno, since double is a 4 byte type just like float.  I use double for
-   consistency in implementing C++ floating point numbers as unless there
-   are memory optimizations required to use other types.
+    The .run() method will start the scanner.  Measurements in cm and data storage 
+    are handled by the class with RAII principles.
 */
 
 #ifndef Scanner_h
 #define Scanner_h
 
 #define DEBUG_SCAN 0        //1 for compilation outside of Arduino IDE
-#define DEBUG_SER  0        //1 for debug prints to adruino Serial.print cmd
+#define DEBUG_SER  1        //1 for debug prints to adruino Serial.print cmd
 
 #if DEBUG_SCAN == 0
     #include <Arduino.h>
@@ -136,7 +135,7 @@ public:
           const int center = 90,
           const int span = 180,
           const int test_points = 5,
-          const int servo_angular_rate = 280/60+5);	//in millisec / deg.  Futaba S3004 280us/60deg plus a tad
+          const int servo_angular_rate = 280/60+500);	//in millisec / deg.  Futaba S3004 280us/60deg plus a tad
           
   // NON-MODIFYING METHODS
   const char* headings() { return scan.headings(); }
