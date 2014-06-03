@@ -24,7 +24,7 @@
 #ifndef SCANNER_H
 #define SCANNER_H value
 
-#define DEBUG_SER  1        //1 for debug prints to adruino Serial.print cmd
+#define DEBUG_SER  0        //1 for debug prints to adruino Serial.print cmd
 
 #include <Arduino.h>
 #include <Servo.h>
@@ -113,7 +113,7 @@ private:
   Scan_order scan_order;
   
   int find_delay(int target_angle);
-  void take_reading();       
+  void take_reading(const int heading);       
   long pulse();
   int us_to_cm(const long duration); 
 

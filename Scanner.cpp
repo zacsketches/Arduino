@@ -27,7 +27,7 @@ Scan::Scan(const int scan_points, const int span, const int center)
     //to the left (port) and odd points to right (starboard)...can't
     //help it..Navy habits die hard
     int head = center;
-    int dir = -1;
+    int dir = 1;
     int multiple = 0;
     for(int i = 0; i < scan_points; ++i) {
         #if DEBUG_SCAN == 1
@@ -250,7 +250,7 @@ void Scanner::run(){
     
     //if servo move complete, then pulse and update measurement
     if(servo_state == 0x04) {	//B0000 0100->move_complete
-        take_reading();
+        take_reading(target_heading);
         servo_state = 0x01;	    //B0000 0001->ready
         ++scan_order;           //advance current to the the next scan point
         #if DEBUG_SER == 1
@@ -285,15 +285,14 @@ int Scanner::find_delay(const int target_angle) {
 	return delay;	//in milliseconds
 }
 
-void Scanner::take_reading() {
+void Scanner::take_reading(const int heading) {
     //the servo is already in the right position when this method is
     //called so we just need to bang the sonar, get the measurement
     //and then save it to the scan
     long dur = pulse();
     int cm = us_to_cm(dur);
     
-    int scan_index = scan_order.current();
-    scan.update_by_index(scan_index, cm);
+    scan.update_by_heading(heading, cm);
 }
 
 // PULSE THE SENSOR AND RETURN THE DATA
