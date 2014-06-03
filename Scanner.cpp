@@ -198,25 +198,28 @@ Scanner::Scanner(const int servo_pin,
     :sp(servo_pin), pp(ping_pin), ctr(center), scan(test_points, span, center),
      sar(servo_angular_rate), scan_order(test_points)
 {
-    //attach servo
-    servo.attach(servo_pin);
+
     servo_state = 0x01;     // Ready
     
-    /*
-        TODO take the hard coded cheats out of scan_order
-    */
-    
     //no setup configuration required for Ping))) sensor
+    //running the .attach() function for the servo from the constructor yields
+    //undefined servo behavior.  .attach() must be run from the setup function.
+}
+
+bool Scanner::attach() {
+    servo.attach(sp);
+    return servo.attached();
 }
 
 // RUN ... take data and store it.
 void Scanner::run(){
     static unsigned long command_time;	//time servo ordered to move
     static unsigned long ready_time;	//time servo will be ready
+    static int target_heading = 90;
     
     //if servo is ready then order next scan
-    if(servo_state & B00000001 == 0x01) {	    //B0001 tests servo_ready bit
-        int target_heading = scan.heading_by_index( scan_order.current() );
+    if(servo_state & 0x01 == 0x01) {	    //B0001 tests servo_ready bit
+        target_heading = scan.heading_by_index( scan_order.current() );
         #if DEBUG_SER == 1
             Serial.print("target_heading is: ");
             Serial.println(target_heading);
@@ -238,7 +241,8 @@ void Scanner::run(){
     //if servo move ordered and time has elapsed then move is complete
     if((servo_state == 0x02) && ( millis()>=ready_time) ) { //B0000 0010->move_ordered
         #if DEBUG_SER == 1
-            Serial.println("\tmove ordered and time expired");
+            Serial.print("\tmove ordered and time expired.  servo_state is: ");
+            Serial.println(servo_state, HEX);
         #endif
         servo_state = 0x04; 	//B0000 0100->move_complete
     }
@@ -248,6 +252,10 @@ void Scanner::run(){
         take_reading();
         servo_state = 0x01;	    //B0000 0001->ready
         ++scan_order;           //advance current to the the next scan point
+        #if DEBUG_SER == 1
+          Serial.print("\tmove complete and servo_state is is: ");
+          Serial.println(servo_state, HEX);
+        #endif
     }
 }
 
@@ -258,9 +266,20 @@ void Scanner::run(){
 // RETURN DELAY IN MILLISECONDS FOR THE SERVO TO MOVE BETWEEN TWO ANGLES
 int Scanner::find_delay(const int target_angle) {
 	int current_angle = servo.read();
+	#if DEBUG_SER == 1
+	  Serial.print("\tcurrent_angle is: ");
+	  Serial.println(current_angle);
+	#endif
 	int theta = target_angle - current_angle;
 	theta = abs(theta);
-
+	#if DEBUG_SER == 1
+	  Serial.print("\ttheta is: ");
+	  Serial.println(theta);
+	#endif
+    #if DEBUG_SER == 1
+      Serial.print("\tsar is: ");
+      Serial.println(sar);
+    #endif
 	int delay = theta * sar;
 	return delay;	//in milliseconds
 }
