@@ -5,14 +5,14 @@
 /* 
    Scanner implements control over an ultrsonic sensor mounted to a 
    servo in order to scan multiple headings with a single sensor.
-   
+      
    The signature for creating a scanner is:
    Scanner(const int servo_pin, 
            const int ping_pin, 
            const int center = 90,
            const int span = 180,
            const int test_points = 5,
-           const int servo_angular_rate = 280/60+5);	in millisec / deg.  Futaba S3004 280us/60deg plus a tad
+           const int servo_angular_rate = 240/60+5);	in millisec / deg.  Futaba S3004 280us/60deg plus a tad
              
     Calling .data() or .readings() returns a JSON formatted string of the most recent
     data in the scanner.
@@ -21,20 +21,12 @@
     are handled by the class with RAII principles.
 */
 
-#ifndef Scanner_h
-#define Scanner_h
+#ifndef SCANNER_H
+#define SCANNER_H value
 
-#define DEBUG_SCAN 0        //1 for compilation outside of Arduino IDE
 #define DEBUG_SER  1        //1 for debug prints to adruino Serial.print cmd
 
-#if DEBUG_SCAN == 0
-    #include <Arduino.h>
-#endif
-
-#if DEBUG_SCAN == 1
-    #include <iostream>
-#endif
-
+#include <Arduino.h>
 #include <Servo.h>
 
 class Scan_point{
@@ -59,7 +51,7 @@ class Scan {
   char* dat;
 
 public:  
-  Scan(const int scan_points=5, const int span=180, const int center=90);
+  Scan(const int scan_points=5, const int span=170, const int center=90);
   ~Scan();
   
   // NON-MODIFYING METHODS //
@@ -80,16 +72,16 @@ public:
 //*                         SCANNER CLASS
 //*******************************************************************
 
-class Scanner : public Servo {
+class Scanner {
 private: 
   //Servo data
   int sp;                 //Servo pin
   int ctr;                //where the servo points directly ahead of the bot
   Servo servo;            //Servo object
   int sar;                //servo_angular_rate the servo turns out
-  char servo_state;       // B0001->servo ready 
-  					      // B0010->move ordered 
-                          // B0100->move complete
+  char servo_state;       // B0000 0001->servo ready 
+  					      // B0000 0010->move ordered 
+                          // B0000 0100->move complete
   struct Scan_order{
       int* order;
       int pos;
@@ -117,6 +109,7 @@ private:
 
   //Scan object handles data for the scanner
   Scan  scan;
+  //Scan_order object handles the order in which the scanner moves between Scan_points
   Scan_order scan_order;
   
   int find_delay(int target_angle);
@@ -133,14 +126,14 @@ public:
   Scanner(const int servo_pin, 
           const int ping_pin, 
           const int center = 90,
-          const int span = 180,
+          const int span = 170,
           const int test_points = 5,
-          const int servo_angular_rate = 280/60+500);	//in millisec / deg.  Futaba S3004 280us/60deg plus a tad
+          const int servo_angular_rate = (240/60+5) );	//in ms / deg.  For ref, Futaba S3004 230ms/60deg
           
   // NON-MODIFYING METHODS
   const char* headings() { return scan.headings(); }
   const char* data() { return scan.data(); }
-  
+  bool attach();                                //attach the servo
   // MODIFYING METHODS
   void run();      //run a scan of all headings in the scan pattern
   
