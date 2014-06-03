@@ -206,6 +206,7 @@ Scanner::Scanner(const int servo_pin,
     //undefined servo behavior.  .attach() must be run from the setup function.
 }
 
+// ATTACH THE SCANNER..must be in setup.
 bool Scanner::attach() {
     servo.attach(sp);
     return servo.attached();
