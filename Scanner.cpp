@@ -93,7 +93,7 @@ Scan::~Scan() {
 }
 
 // RETURN POINTER TO THE HEADINGS BUFFER CONTAINING A JSON STRING
-const char* Scan::headings() const{
+char* Scan::headings() const{
     //basic JSON string as follows {\"Headings\": [90,45,135,0,180]}
     
     //temp buffer for string representation of int val
@@ -122,7 +122,7 @@ const int Scan::heading_by_index(const int index) const{
 
 
 // RETURN POINTER TO THE DATA BUFFER CONTAINING A JSON STRING
-const char* Scan::data() const{
+char* Scan::data() const{
     //basic JSON string as follows {\"Measurements\": [L,L,L,L,L]}
     
     //temp buffer for string representation of long val
@@ -202,8 +202,9 @@ Scanner::Scanner(const int servo_pin,
     servo_state = 0x01;     // Ready
     
     //no setup configuration required for Ping))) sensor
-    //running the .attach() function for the servo from the constructor yields
-    //undefined servo behavior.  .attach() must be run from the setup function.
+    //running the Servo::attach(int) function for the servo from the constructor yields
+    //undefined servo behavior.  
+    //    Scanner::attach() must be run from the setup function.
 }
 
 // ATTACH THE SCANNER..must be in setup.

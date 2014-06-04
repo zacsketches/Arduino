@@ -57,10 +57,10 @@ public:
   // NON-MODIFYING METHODS //
   int size() const { return sz; }
   int span() const { return spn; }
-  const char* headings() const;        //JSON format pointer to heads[]
+  char* headings() const;        //JSON format pointer to heads[]
   const int heading_by_index(const int index) const;
   
-  const char* data() const;            //JSON format pointer to dat[]
+  char* data() const;            //JSON format pointer to dat[]
   
   // MODIFYING METHODS //            
   bool update_by_heading(const int heading, const int data);  //returns true on successful update
@@ -131,9 +131,10 @@ public:
           const int servo_angular_rate = (240/60+5) );	//in ms / deg.  For ref, Futaba S3004 230ms/60deg
           
   // NON-MODIFYING METHODS
-  const char* headings() { return scan.headings(); }
-  const char* data() { return scan.data(); }
+  char* headings() { return scan.headings(); }
+  char* data() { return scan.data(); }
   bool attach();                                //attach the servo
+  int size() { return scan.size(); }
   // MODIFYING METHODS
   void run();      //run a scan of all headings in the scan pattern
   
