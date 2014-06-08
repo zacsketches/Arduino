@@ -17,8 +17,14 @@
     Calling .data() or .readings() returns a JSON formatted string of the most recent
     data in the scanner.
 
-    The .run() method will start the scanner.  Measurements in cm and data storage 
-    are handled by the class with RAII principles.
+    You must run .attach() in the setup method of the Arduino sketch.
+
+    The .run() method will start the scanner.  
+    
+    Measurements are in cm.
+    
+    Data storage is handled by the class with RAII principles.  No need for users to
+    call delete.
 */
 
 #ifndef SCANNER_H
