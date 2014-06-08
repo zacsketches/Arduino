@@ -1,8 +1,6 @@
 Arduino Scanner
 ===============
 
-Giving a demo of how Github works
-
 Scanner implements control over an ultrsonic sensor mounted to a  servo in order to scan multiple headings with a single sensor.
       
 The signature for creating a scanner is:
