@@ -1,5 +1,5 @@
 Scanner	KEYWORD1
 attach	KEYWORD2
-run		KEYWORD2
+run	KEYWORD2
 data	KEYWORD2
 data_size	KEYWORD2
