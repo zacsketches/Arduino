@@ -195,8 +195,8 @@ Scanner::Scanner(const int servo_pin,
     const int span,
     const int test_points,
     const int servo_angular_rate)
-    :sp(servo_pin), pp(ping_pin), ctr(center), scan(test_points, span, center),
-     sar(servo_angular_rate), scan_order(test_points)
+    :sp(servo_pin), pp(ping_pin), ctr(center), tp(test_points), 
+     scan(test_points, span, center), sar(servo_angular_rate), scan_order(test_points)
 {
 
     servo_state = 0x01;     // Ready
@@ -207,7 +207,24 @@ Scanner::Scanner(const int servo_pin,
     //    Scanner::attach() must be run from the setup function.
 }
 
-// ATTACH THE SCANNER..must be in setup.
+//return the size of the data buffer
+int Scanner::data_size() const {
+    //Meausrements JSON string as follows {\"Measurements\": [L,L,L,L,L]}
+    //  size:    curlys 2
+    //         brackets 2
+    //         quotes   2
+    //         colon    1
+    //        escapes   2
+    //    Measurements  12
+    //       space      1
+    //       commas     1 * scan_points...actually scan_points-1 but who's counting
+    //        vals      5 * scan_points  max int is 32,767 (5 digits)
+    //       null term  1
+    
+    return (2+2+2+1+2+12+1+(tp-1)+(5*tp)+1);
+}
+
+// ATTACH THE SCANNER..must be called in setup.
 bool Scanner::attach() {
     servo.attach(sp);
     return servo.attached();

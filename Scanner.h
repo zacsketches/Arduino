@@ -77,6 +77,7 @@ private:
   //Servo data
   int sp;                 //Servo pin
   int ctr;                //where the servo points directly ahead of the bot
+  int tp;                 //the number of test points used in the scan
   Servo servo;            //Servo object
   int sar;                //servo_angular_rate the servo turns out
   char servo_state;       // B0000 0001->servo ready 
@@ -133,6 +134,7 @@ public:
   // NON-MODIFYING METHODS
   char* headings() { return scan.headings(); }
   char* data() { return scan.data(); }
+  int data_size() const;
   bool attach();                                //attach the servo
   int size() { return scan.size(); }
   // MODIFYING METHODS
