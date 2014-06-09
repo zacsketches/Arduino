@@ -11,7 +11,7 @@ The signature for creating a scanner is:
            const int center = 90,
            const int span = 170,
            const int test_points = 5,
-           const int servo_angular_rate = 240/60+5);	//in millisec / deg.  Futaba S3004 280us/60deg
+           const int servo_angular_rate = 240/60+5);	//in millisec / deg.  Futaba S3004 280ms/60deg
 ```
 
 Calling .data() or .readings() returns a JSON formatted string of the most recent data in the scanner.
