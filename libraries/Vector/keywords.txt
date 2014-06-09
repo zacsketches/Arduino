@@ -1,2 +1,0 @@
-Vector	KEYWORD1
-size	KEYWORD2

@@ -1,395 +1,346 @@
 /*
- Servo.cpp - Interrupt driven Servo library for Arduino using 16 bit timers- Version 2
- Copyright (c) 2009 Michael Margolis.  All right reserved.
- 
- This library is free software; you can redistribute it and/or
- modify it under the terms of the GNU Lesser General Public
- License as published by the Free Software Foundation; either
- version 2.1 of the License, or (at your option) any later version.
- 
- This library is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- Lesser General Public License for more details.
- 
- You should have received a copy of the GNU Lesser General Public
- License along with this library; if not, write to the Free Software
- Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
- */
-
-/* 
- 
- A servo is activated by creating an instance of the Servo class passing the desired pin to the attach() method.
- The servos are pulsed in the background using the value most recently written using the write() method
- 
- Note that analogWrite of PWM on pins associated with the timer are disabled when the first servo is attached.
- Timers are seized as needed in groups of 12 servos - 24 servos use two timers, 48 servos will use four.
- 
- The methods are:
- 
- Servo - Class for manipulating servo motors connected to Arduino pins.
- 
- attach(pin )  - Attaches a servo motor to an i/o pin.
- attach(pin, min, max  ) - Attaches to a pin setting min and max values in microseconds
- default min is 544, max is 2400  
- 
- write()     - Sets the servo angle in degrees.  (invalid angle that is valid as pulse in microseconds is treated as microseconds)
- writeMicroseconds() - Sets the servo pulse width in microseconds 
- read()      - Gets the last written servo pulse width as an angle between 0 and 180. 
- readMicroseconds()   - Gets the last written servo pulse width in microseconds. (was read_us() in first release)
- attached()  - Returns true if there is a servo attached. 
- detach()    - Stops an attached servos from pulsing its i/o pin. 
- 
+    TODO add my beer license
+    
+    See Scanner.h for usage. 
+    
 */
-
-#include <avr/interrupt.h>
-#include <Arduino.h> 
 
 #include "Scanner.h"
 
-#define usToTicks(_us)    (( clockCyclesPerMicrosecond()* _us) / 8)     // converts microseconds to tick (assumes prescale of 8)  // 12 Aug 2009
-#define ticksToUs(_ticks) (( (unsigned)_ticks * 8)/ clockCyclesPerMicrosecond() ) // converts from ticks back to microseconds
 
+//*******************************************************************
+//*                         SCAN METHODS
+//*******************************************************************
 
-#define TRIM_DURATION       2                               // compensation ticks to trim adjust for digitalWrite delays // 12 August 2009
-
-static servo_t servos[MAX_SERVOS];                          // static array of servo structures
-static volatile int8_t Channel[_Nbr_16timers ];             // counter for the servo being pulsed for each timer (or -1 if refresh interval)
-
-uint8_t ServoCount = 0;                                     // the total number of attached servos
-
-// double servo_angular_rate= .28/60;  //Futaba S3004 servo default at 4.8V is .28 sec/60 deg
-
-
-// convenience macros
-#define SERVO_INDEX_TO_TIMER(_servo_nbr) ((timer16_Sequence_t)(_servo_nbr / SERVOS_PER_TIMER)) // returns the timer controlling this servo
-#define SERVO_INDEX_TO_CHANNEL(_servo_nbr) (_servo_nbr % SERVOS_PER_TIMER)       // returns the index of the servo on this timer
-#define SERVO_INDEX(_timer,_channel)  ((_timer*SERVOS_PER_TIMER) + _channel)     // macro to access servo index by timer and channel
-#define SERVO(_timer,_channel)  (servos[SERVO_INDEX(_timer,_channel)])            // macro to access servo class by timer and channel
-
-#define SERVO_MIN() (MIN_PULSE_WIDTH - this->min * 4)  // minimum value in uS for this servo
-#define SERVO_MAX() (MAX_PULSE_WIDTH - this->max * 4)  // maximum value in uS for this servo 
-
-/************ static functions common to all instances ***********************/
-
-static inline void handle_interrupts(timer16_Sequence_t timer, volatile uint16_t *TCNTn, volatile uint16_t* OCRnA)
+// CONSTRUCTOR
+/*
+    TODO implement margin near the edges of the servo travel
+*/
+Scan::Scan(const int scan_points, const int span, const int center) 
+    :sz(scan_points), spn(span), elem(new Scan_point[scan_points])
 {
-  if( Channel[timer] < 0 )
-    *TCNTn = 0; // channel set to -1 indicated that refresh interval completed so reset the timer 
-  else{
-    if( SERVO_INDEX(timer,Channel[timer]) < ServoCount && SERVO(timer,Channel[timer]).Pin.isActive == true )  
-      digitalWrite( SERVO(timer,Channel[timer]).Pin.nbr,LOW); // pulse this channel low if activated   
-  }
-
-  Channel[timer]++;    // increment to the next channel
-  if( SERVO_INDEX(timer,Channel[timer]) < ServoCount && Channel[timer] < SERVOS_PER_TIMER) {
-    *OCRnA = *TCNTn + SERVO(timer,Channel[timer]).ticks;
-    if(SERVO(timer,Channel[timer]).Pin.isActive == true)     // check if activated
-      digitalWrite( SERVO(timer,Channel[timer]).Pin.nbr,HIGH); // its an active channel so pulse it high   
-  }  
-  else { 
-    // finished all channels so wait for the refresh period to expire before starting over 
-    if( ((unsigned)*TCNTn) + 4 < usToTicks(REFRESH_INTERVAL) )  // allow a few ticks to ensure the next OCR1A not missed
-      *OCRnA = (unsigned int)usToTicks(REFRESH_INTERVAL);  
-    else 
-      *OCRnA = *TCNTn + 4;  // at least REFRESH_INTERVAL has elapsed
-    Channel[timer] = -1; // this will get incremented at the end of the refresh period to start again at the first channel
-  }
-}
-
-#ifndef WIRING // Wiring pre-defines signal handlers so don't define any if compiling for the Wiring platform
-// Interrupt handlers for Arduino 
-#if defined(_useTimer1)
-ISR(TIMER1_COMPA_vect) 
-{ 
-  handle_interrupts(_timer1, &TCNT1, &OCR1A); 
-}
-#endif
-
-#if defined(_useTimer3)
-ISR(TIMER3_COMPA_vect) 
-{ 
-  handle_interrupts(_timer3, &TCNT3, &OCR3A); 
-}
-#endif
-
-#if defined(_useTimer4)
-ISR(TIMER4_COMPA_vect) 
-{
-  handle_interrupts(_timer4, &TCNT4, &OCR4A); 
-}
-#endif
-
-#if defined(_useTimer5)
-ISR(TIMER5_COMPA_vect) 
-{
-  handle_interrupts(_timer5, &TCNT5, &OCR5A); 
-}
-#endif
-
-#elif defined WIRING
-// Interrupt handlers for Wiring 
-#if defined(_useTimer1)
-void Timer1Service() 
-{ 
-  handle_interrupts(_timer1, &TCNT1, &OCR1A); 
-}
-#endif
-#if defined(_useTimer3)
-void Timer3Service() 
-{ 
-  handle_interrupts(_timer3, &TCNT3, &OCR3A); 
-}
-#endif
-#endif
-
-
-static void initISR(timer16_Sequence_t timer)
-{  
-#if defined (_useTimer1)
-  if(timer == _timer1) {
-    TCCR1A = 0;             // normal counting mode 
-    TCCR1B = _BV(CS11);     // set prescaler of 8 
-    TCNT1 = 0;              // clear the timer count 
-#if defined(__AVR_ATmega8__)|| defined(__AVR_ATmega128__)
-    TIFR |= _BV(OCF1A);      // clear any pending interrupts; 
-    TIMSK |=  _BV(OCIE1A) ;  // enable the output compare interrupt  
-#else
-    // here if not ATmega8 or ATmega128
-    TIFR1 |= _BV(OCF1A);     // clear any pending interrupts; 
-    TIMSK1 |=  _BV(OCIE1A) ; // enable the output compare interrupt 
-#endif    
-#if defined(WIRING)       
-    timerAttach(TIMER1OUTCOMPAREA_INT, Timer1Service); 
-#endif	
-  } 
-#endif  
-
-#if defined (_useTimer3)
-  if(timer == _timer3) {
-    TCCR3A = 0;             // normal counting mode 
-    TCCR3B = _BV(CS31);     // set prescaler of 8  
-    TCNT3 = 0;              // clear the timer count 
-#if defined(__AVR_ATmega128__)
-    TIFR |= _BV(OCF3A);     // clear any pending interrupts;   
-	ETIMSK |= _BV(OCIE3A);  // enable the output compare interrupt     
-#else  
-    TIFR3 = _BV(OCF3A);     // clear any pending interrupts; 
-    TIMSK3 =  _BV(OCIE3A) ; // enable the output compare interrupt      
-#endif
-#if defined(WIRING)    
-    timerAttach(TIMER3OUTCOMPAREA_INT, Timer3Service);  // for Wiring platform only	
-#endif  
-  }
-#endif
-
-#if defined (_useTimer4)
-  if(timer == _timer4) {
-    TCCR4A = 0;             // normal counting mode 
-    TCCR4B = _BV(CS41);     // set prescaler of 8  
-    TCNT4 = 0;              // clear the timer count 
-    TIFR4 = _BV(OCF4A);     // clear any pending interrupts; 
-    TIMSK4 =  _BV(OCIE4A) ; // enable the output compare interrupt
-  }    
-#endif
-
-#if defined (_useTimer5)
-  if(timer == _timer5) {
-    TCCR5A = 0;             // normal counting mode 
-    TCCR5B = _BV(CS51);     // set prescaler of 8  
-    TCNT5 = 0;              // clear the timer count 
-    TIFR5 = _BV(OCF5A);     // clear any pending interrupts; 
-    TIMSK5 =  _BV(OCIE5A) ; // enable the output compare interrupt      
-  }
-#endif
-} 
-
-static void finISR(timer16_Sequence_t timer)
-{
-    //disable use of the given timer
-#if defined WIRING   // Wiring
-  if(timer == _timer1) {
-    #if defined(__AVR_ATmega1281__)||defined(__AVR_ATmega2561__)
-    TIMSK1 &=  ~_BV(OCIE1A) ;  // disable timer 1 output compare interrupt
-    #else 
-    TIMSK &=  ~_BV(OCIE1A) ;  // disable timer 1 output compare interrupt   
+    //divide the span in angular sections and assign the test points
+    int sections = scan_points - 1;
+    int angular_seperation = span / sections;
+    
+    //scan point zero is at the center of the scan with even points
+    //to the left (port) and odd points to right (starboard)...can't
+    //help it..Navy habits die hard
+    int head = center;
+    int dir = 1;
+    int multiple = 0;
+    for(int i = 0; i < scan_points; ++i) {
+        #if DEBUG_SCAN == 1
+          std::cout<<"multiple is: "<< multiple <<std::endl;
+        #endif
+        #if DEBUG_SCAN == 1
+          std::cout<<"dir is: "<< dir <<std::endl;
+        #endif
+        head = center + (dir * multiple * angular_seperation); 
+        elem[i].set_heading(head);      
+        #if DEBUG_SCAN == 1
+          std::cout<<"head is: "<< head <<std::endl;
+        #endif
+        if(i==0) ++multiple;
+        if(i>0 && (i%2==0)) ++multiple;
+        dir = -1 * dir; 
+    }
+    
+    //allocate buffers for the heading character array
+    //basic JSON string as follows {\"Headings\": [90,45,135,0,180]}
+    //  size:    curlys 2
+    //         brackets 2
+    //         quotes   2
+    //         colon    1
+    //        escapes   2
+    //       Headings   8
+    //       space      1
+    //       commas     1 * scan_points...actually scan_points-1 but who's counting
+    //        vals      3 * scan points
+    //       null term  1
+    int heading_buf_sz = 2+2+2+1+2+8+1+(1*scan_points)+(3*scan_points)+1;
+    #if DEBUG_SCAN == 1
+      std::cout<<"heading_buf_sz is: "<< heading_buf_sz <<std::endl;
     #endif
-    timerDetach(TIMER1OUTCOMPAREA_INT); 
-  }
-  else if(timer == _timer3) {     
-    #if defined(__AVR_ATmega1281__)||defined(__AVR_ATmega2561__)
-    TIMSK3 &= ~_BV(OCIE3A);    // disable the timer3 output compare A interrupt
-    #else
-    ETIMSK &= ~_BV(OCIE3A);    // disable the timer3 output compare A interrupt
+    heads = new char[heading_buf_sz];
+    
+    //allocate buffers for the data character array
+    //basic JSON string as follows {\"Measurements\": [L,L,L,L,L]}
+    //  size:    curlys 2
+    //         brackets 2
+    //         quotes   2
+    //         colon    1
+    //        escapes   2
+    //    Measurements  12
+    //       space      1
+    //       commas     1 * scan_points...actually scan_points-1 but who's counting
+    //        vals      5 * scan_points  max int is 32,767 (5 digits)
+    //       null term  1
+    int data_buf_sz = 2+2+2+1+2+12+1+(1*scan_points)+(5*scan_points)+1;
+    #if DEBUG_SCAN == 1
+      std::cout<<"data_buf_sz is: "<< data_buf_sz <<std::endl;
     #endif
-    timerDetach(TIMER3OUTCOMPAREA_INT);
-  }
-#else
-    //For arduino - in future: call here to a currently undefined function to reset the timer
-#endif
+    dat = new char[data_buf_sz];
 }
 
-static boolean isTimerActive(timer16_Sequence_t timer)
+// DESTRUCTOR
+Scan::~Scan() {
+    //RAII takes care of cleanup when the object goes out of scope
+    delete[] elem; 
+    delete[] heads; 
+    delete[] dat; 
+
+}
+
+// RETURN POINTER TO THE HEADINGS BUFFER CONTAINING A JSON STRING
+char* Scan::headings() const{
+    //basic JSON string as follows {\"Headings\": [90,45,135,0,180]}
+    
+    //temp buffer for string representation of int val
+    char buf[sizeof(long)];
+    
+    strcpy(heads, "{\"Headings\": [" ) ;
+    for(int i = 0; i < sz; ++i) {
+        //get string representation of heading val
+        sprintf(buf, "%d", elem[i].heading());
+        
+        if(i != 0) strcat(heads,",");
+        strcat(heads, buf);
+    }
+    strcat(heads, "]}");
+    
+    return heads;
+}
+
+// RETURN INT OF A HEADING BY THE INDEX, -1 ON INDEX OUT OF BOUNDS
+const int Scan::heading_by_index(const int index) const{
+    if( (index >=0) && (index < sz) ) {
+        return elem[index].heading();
+    }
+    return -1;
+}
+
+
+// RETURN POINTER TO THE DATA BUFFER CONTAINING A JSON STRING
+char* Scan::data() const{
+    //basic JSON string as follows {\"Measurements\": [L,L,L,L,L]}
+    
+    //temp buffer for string representation of long val
+    char buf[sizeof(long)];
+    
+    strcpy(dat, "{\"Measurements\": [");
+    for(int i = 0; i < sz; ++i) {
+        //get string representation of dat val
+        sprintf(buf, "%d", elem[i].data());
+        
+        if(i != 0) strcat(dat, ",");
+        strcat(dat, buf);
+    }
+    strcat(dat, "]}");
+    
+    return dat;
+}
+
+// UPDATE DATA IN THE SCAN
+bool Scan::update_by_heading(const int heading, const int data){
+    //returns true on successful update
+    bool success = false;
+    for(int i = 0; i < sz; ++i) {
+        //find index for given heading
+        if (elem[i].heading() == heading) {
+            elem[i].set_data(data);
+            success = true;
+            break;
+        }
+    }
+    return success;
+}
+
+bool Scan::update_by_index(const int index, const int data){
+    //returns true on successful update
+    bool success = false;
+    if( (index >=0) && (index < sz) ) {
+        elem[index].set_data(data);
+        success = true;
+    }
+    return success;
+}
+
+//*******************************************************************
+//*                         SCAN ORDER CONSTRUCTOR
+//*******************************************************************
+Scanner::Scan_order::Scan_order(int test_points) {
+    pos = 0;
+    sz = 2* (test_points -1);
+    order = new int[sz];
+    int mult = 1;
+    for(int i = 0; i < sz; ++i) {
+        if(i%2 == 0) order[i] = 0;    //always come back to the middle
+        else {
+            order[i] = mult;
+            ++mult;
+        }
+    }     
+}
+
+
+//*******************************************************************
+//*                         SCANNER CLASS METHODS
+//*******************************************************************
+
+// CONSTRUCTOR
+Scanner::Scanner(const int servo_pin, 
+    const int ping_pin, 
+    const int center,
+    const int span,
+    const int test_points,
+    const int servo_angular_rate)
+    :sp(servo_pin), pp(ping_pin), ctr(center), tp(test_points), 
+     scan(test_points, span, center), sar(servo_angular_rate), scan_order(test_points)
 {
-  // returns true if any servo is active on this timer
-  for(uint8_t channel=0; channel < SERVOS_PER_TIMER; channel++) {
-    if(SERVO(timer,channel).Pin.isActive == true)
-      return true;
-  }
-  return false;
+
+    servo_state = 0x01;     // Ready
+    
+    //no setup configuration required for Ping))) sensor
+    //running the Servo::attach(int) function for the servo from the constructor yields
+    //undefined servo behavior.  
+    //    Scanner::attach() must be run from the setup function.
+}
+
+//return the size of the data buffer
+int Scanner::data_size() const {
+    //Meausrements JSON string as follows {\"Measurements\": [L,L,L,L,L]}
+    //  size:    curlys 2
+    //         brackets 2
+    //         quotes   2
+    //         colon    1
+    //        escapes   2
+    //    Measurements  12
+    //       space      1
+    //       commas     1 * scan_points...actually scan_points-1 but who's counting
+    //        vals      5 * scan_points  max int is 32,767 (5 digits)
+    //       null term  1
+    
+    return (2+2+2+1+2+12+1+(tp-1)+(5*tp)+1);
+}
+
+// ATTACH THE SCANNER..must be called in setup.
+bool Scanner::attach() {
+    servo.attach(sp);
+    return servo.attached();
+}
+
+// RUN ... take data and store it.
+void Scanner::run(){
+    static unsigned long command_time;	//time servo ordered to move
+    static unsigned long ready_time;	//time servo will be ready
+    static int target_heading = 90;
+    
+    //if servo is ready then order next scan
+    if(servo_state & 0x01 == 0x01) {	    //B0001 tests servo_ready bit
+        target_heading = scan.heading_by_index( scan_order.current() );
+        #if DEBUG_SER == 1
+            Serial.print("target_heading is: ");
+            Serial.println(target_heading);
+        #endif
+        command_time=millis();		        //record time move was ordered
+        ready_time = command_time + find_delay(target_heading);
+        servo.write(target_heading);		//order servo to move
+        servo_state = 0x02;		           //set state to B0000 0010->move ordered
+        #if DEBUG_SER == 1
+            Serial.print("\tcommand time is: ");
+            Serial.println(command_time);
+            Serial.print("\tready time is: ");
+            Serial.println(ready_time);
+            Serial.print("\tservo state is: ");
+            Serial.println(servo_state, HEX);
+        #endif          
+    }
+    
+    //if servo move ordered and time has elapsed then move is complete
+    if((servo_state == 0x02) && ( millis()>=ready_time) ) { //B0000 0010->move_ordered
+        #if DEBUG_SER == 1
+            Serial.print("\tmove ordered and time expired.  servo_state is: ");
+            Serial.println(servo_state, HEX);
+        #endif
+        servo_state = 0x04; 	//B0000 0100->move_complete
+    }
+    
+    //if servo move complete, then pulse and update measurement
+    if(servo_state == 0x04) {	//B0000 0100->move_complete
+        take_reading(target_heading);
+        servo_state = 0x01;	    //B0000 0001->ready
+        ++scan_order;           //advance current to the the next scan point
+        #if DEBUG_SER == 1
+          Serial.print("\tmove complete and servo_state is is: ");
+          Serial.println(servo_state, HEX);
+        #endif
+    }
+}
+
+//*******************************************************************
+//*                         SCANNER HELPER FUNCTIONS
+//*******************************************************************
+
+// RETURN DELAY IN MILLISECONDS FOR THE SERVO TO MOVE BETWEEN TWO ANGLES
+int Scanner::find_delay(const int target_angle) {
+	int current_angle = servo.read();
+	#if DEBUG_SER == 1
+	  Serial.print("\tcurrent_angle is: ");
+	  Serial.println(current_angle);
+	#endif
+	int theta = target_angle - current_angle;
+	theta = abs(theta);
+	#if DEBUG_SER == 1
+	  Serial.print("\ttheta is: ");
+	  Serial.println(theta);
+	#endif
+    #if DEBUG_SER == 1
+      Serial.print("\tsar is: ");
+      Serial.println(sar);
+    #endif
+	int delay = theta * sar;
+	return delay;	//in milliseconds
+}
+
+void Scanner::take_reading(const int heading) {
+    //the servo is already in the right position when this method is
+    //called so we just need to bang the sonar, get the measurement
+    //and then save it to the scan
+    long dur = pulse();
+    int cm = us_to_cm(dur);
+    
+    scan.update_by_heading(heading, cm);
+}
+
+// PULSE THE SENSOR AND RETURN THE DATA
+long Scanner::pulse() {
+    //standard pulse method for Parallax PING))) sensor
+    pinMode(pp, OUTPUT);
+    digitalWrite(pp, LOW);
+    delayMicroseconds(2);
+    digitalWrite(pp, HIGH);
+    delayMicroseconds(5);
+    digitalWrite(pp, LOW);
+
+    // The same pin is used to read the signal from the PING))): a HIGH
+    // pulse whose duration is the time (in microseconds) from the sending
+    // of the ping to the reception of its echo off of an object.
+    pinMode(pp, INPUT);
+    long duration = pulseIn(pp, HIGH);
+
+    return duration;
 }
 
 
-/****************** end of static functions ******************************/
-
-Scanner::Scanner()
-{
-  if( ServoCount < MAX_SERVOS) {
-    this->servoIndex = ServoCount++;                    // assign a servo index to this instance
-	servos[this->servoIndex].ticks = usToTicks(DEFAULT_PULSE_WIDTH);   // store default values  - 12 Aug 2009
-  }
-  else
-    this->servoIndex = INVALID_SERVO ;  // too many servos 
-}
-
-uint8_t Scanner::attach(int pin, int pingPin)
-{
-  int min = MIN_PULSE_WIDTH;
-  int max = MAX_PULSE_WIDTH;
-  if(this->servoIndex < MAX_SERVOS ) {
-    pinMode( pin, OUTPUT) ;                                   // set servo pin to output
-    servos[this->servoIndex].Pin.nbr = pin;  
-    // todo min/max check: abs(min - MIN_PULSE_WIDTH) /4 < 128 
-    this->min  = (MIN_PULSE_WIDTH - min)/4; //resolution of min/max is 4 uS
-    this->max  = (MAX_PULSE_WIDTH - max)/4; 
-    // initialize the timer if it has not already been initialized 
-    timer16_Sequence_t timer = SERVO_INDEX_TO_TIMER(servoIndex);
-    if(isTimerActive(timer) == false)
-      initISR(timer);    
-    servos[this->servoIndex].Pin.isActive = true;  // this must be set after the check for isTimerActive
-  }
-  span=160;					    //degrees
-  test_points=5;				//number of location the scanner stops to take a meaurement
-  span_center=90;				//degrees
-  scan_delay=750;				//milliseconds
-  pulse_delay=250;  
-  ping_pin = pingPin;
-  
-  return this->servoIndex ;
-}
-
-long Scanner::measure_angle(int h) {
-	double travel_delay = find_delay(h);
-	travel_delay = int(travel_delay);
-	this->write(h);
-	delay(travel_delay);
-    long duration = this->pulse(ping_pin);
-    long cm = microsecondsToCentimeters(duration);
-    delay(pulse_delay);
-	return cm;
-}
-
-long Scanner::microsecondsToCentimeters(const long microseconds)
+int Scanner::us_to_cm(const long microseconds)
 {
   // The speed of sound is 340 m/s or 29 microseconds per centimeter.
   // The ping travels out and back, so to find the distance of the
   // object we take half of the distance travelled.
+  /*
+    TODO I could calibrate this and take temp and pressure into account,
+    but this doesn't fix the lack or resolution in the sonar sensor
+  */
   return microseconds / 29 / 2;
-}
-
-long Scanner::pulse(const int ping_pin) {
-  pinMode(ping_pin, OUTPUT);
-  digitalWrite(ping_pin, LOW);
-  delayMicroseconds(2);
-  digitalWrite(ping_pin, HIGH);
-  delayMicroseconds(5);
-  digitalWrite(ping_pin, LOW);
-
-  // The same pin is used to read the signal from the PING))): a HIGH
-  // pulse whose duration is the time (in microseconds) from the sending
-  // of the ping to the reception of its echo off of an object.
-  pinMode(ping_pin, INPUT);
-  long duration = pulseIn(ping_pin, HIGH);
-  
-  return duration;
-}
-
-double Scanner::set_servo_angular_rate(double new_rate) {
-	servo_angular_rate = new_rate;
-	return get_servo_angular_rate();
-}
-
-double Scanner::get_servo_angular_rate() {
-	return servo_angular_rate;
-}
-
-double Scanner::find_delay(int target_angle) {
-	int current_angle = this->read();
-	int diff = target_angle - current_angle;
-	diff = abs(diff);
-
-	double delay = diff * get_servo_angular_rate();
-	return delay;	
-}
-
-void Scanner::detach()  
-{
-  servos[this->servoIndex].Pin.isActive = false;  
-  timer16_Sequence_t timer = SERVO_INDEX_TO_TIMER(servoIndex);
-  if(isTimerActive(timer) == false) {
-    finISR(timer);
-  }
-}
-
-void Scanner::write(int value)
-{  
-  if(value < MIN_PULSE_WIDTH)
-  {  // treat values less than 544 as angles in degrees (valid values in microseconds are handled as microseconds)
-    if(value < 0) value = 0;
-    if(value > 180) value = 180;
-    value = map(value, 0, 180, SERVO_MIN(),  SERVO_MAX());      
-  }
-  this->writeMicroseconds(value);
-}
-
-void Scanner::writeMicroseconds(int value)
-{
-  // calculate and store the values for the given channel
-  byte channel = this->servoIndex;
-  if( (channel < MAX_SERVOS) )   // ensure channel is valid
-  {  
-    if( value < SERVO_MIN() )          // ensure pulse width is valid
-      value = SERVO_MIN();
-    else if( value > SERVO_MAX() )
-      value = SERVO_MAX();   
-    
-  	value = value - TRIM_DURATION;
-    value = usToTicks(value);  // convert to ticks after compensating for interrupt overhead - 12 Aug 2009
-
-    uint8_t oldSREG = SREG;
-    cli();
-    servos[channel].ticks = value;  
-    SREG = oldSREG;   
-  } 
-}
-
-int Scanner::read() // return the value as degrees
-{
-  return  map( this->readMicroseconds()+1, SERVO_MIN(), SERVO_MAX(), 0, 180);     
-}
-
-int Scanner::readMicroseconds()
-{
-  unsigned int pulsewidth;
-  if( this->servoIndex != INVALID_SERVO )
-    pulsewidth = ticksToUs(servos[this->servoIndex].ticks)  + TRIM_DURATION ;   // 12 aug 2009
-  else 
-    pulsewidth  = 0;
-
-  return pulsewidth;   
-}
-
-bool Scanner::attached()
-{
-  return servos[this->servoIndex].Pin.isActive ;
 }
