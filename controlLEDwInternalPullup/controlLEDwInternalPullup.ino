@@ -1,5 +1,8 @@
 //written by Dad on 2/18 to better understand how to write
 //serial communication between the Arduino and Processing
+//
+//Button should be connected between ground and pin 2.  Depressing
+//the button will drive pin 2 low from its internal pullup.
 
 const int ledPin=13;
 const int buttonPin=2;
