@@ -18,10 +18,10 @@ int const onSwitch = 5;
 int val = 0;
 boolean LOGGING_ON = false;
 
-boolean const INVERT_X = false;    //due to mounting might be necessary to invert x
+boolean const INVERT_X = false;    //mounting may require X inversion
 
 void setup() {
-	Serial.begin(9600);                  //initialize serial communication
+	Serial.begin(57600);                  //initialize serial communication
         Wire.begin();                        //initialize I2C bus
         //Put the HMC5883 IC into the correct operating mode
          Wire.beginTransmission(address); //open communication with HMC5883
